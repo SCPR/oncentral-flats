@@ -1,0 +1,158 @@
+var addMarker, addProximateStory, canvas, clearOverlays, codeAddress, crosshair, deleteOverlays, geocoder, getMapCenter, map, mapOptions, markersArray, removeProximateStories, showOverlays, size, submitLocation, update_coords;
+addMarker = function(location, title, uri, marker) {
+  var marker_uri;
+  marker_uri = "/static/img/" + marker + ".png";
+  marker = new google.maps.Marker({
+    position: location,
+    title: title,
+    map: map,
+    icon: marker_uri
+  });
+  markersArray.push(marker);
+  return google.maps.event.addListener(marker, 'click', function() {
+    return document.location = uri;
+  });
+};
+showOverlays = function() {
+  var marker, _i, _len, _results;
+  if (markersArray) {
+    _results = [];
+    for (_i = 0, _len = markersArray.length; _i < _len; _i++) {
+      marker = markersArray[_i];
+      _results.push(marker.setMap(map));
+    }
+    return _results;
+  }
+};
+clearOverlays = function() {
+  var marker, _i, _len, _results;
+  if (markersArray) {
+    _results = [];
+    for (_i = 0, _len = markersArray.length; _i < _len; _i++) {
+      marker = markersArray[_i];
+      _results.push(marker.setMap(null));
+    }
+    return _results;
+  }
+};
+deleteOverlays = function() {
+  var marker, _i, _len;
+  if (markersArray) {
+    for (_i = 0, _len = markersArray.length; _i < _len; _i++) {
+      marker = markersArray[_i];
+      marker.setMap(null);
+    }
+    return markersArray.length = 0;
+  }
+};
+getMapCenter = function() {
+  var lat, lng, mode;
+  mode = window.OnCentral.mapMode;
+  if (mode === "update") {
+    lat = $("#id_lat").val();
+    lng = $("#id_lng").val();
+    return new google.maps.LatLng(lat, lng);
+  } else {
+    return new google.maps.LatLng(34.0039295, -118.2564734);
+  }
+};
+removeProximateStories = function() {
+  return $('div#proximate-stories ul').children().remove();
+};
+addProximateStory = function(uri, headline, label) {
+  var html;
+  html = "<li class=\"" + label + "\"><h3><a href=\"" + uri + "\">" + headline + "</a></h3></li>";
+  return $('div#proximate-stories ul').append(html);
+};
+submitLocation = function() {
+  var lat, lng, post_data, size, storyid;
+  size = window.OnCentral.mapSize;
+  lat = map.getCenter().lat();
+  lng = map.getCenter().lng();
+  storyid = $("#storyid").val();
+  if (storyid === "" || storyid === null) {
+    post_data = {
+      'lat': lat,
+      'lng': lng
+    };
+  } else {
+    post_data = {
+      'lat': lat,
+      'lng': lng,
+      'storyid': storyid
+    };
+  }
+  removeProximateStories();
+  return $.post("/location/", post_data, function(data) {
+    var labels, stories;
+    stories = $.parseJSON(data);
+    labels = ['a', 'b', 'c', 'd', 'e'];
+    $.each(stories, function(index, story) {
+      var headline, latlng, uri;
+      uri = story['uri'];
+      headline = story['headline'];
+      latlng = new google.maps.LatLng(story['lat'], story['lng']);
+      addMarker(latlng, headline, uri, labels[index]);
+      if (size !== 'big') {
+        return addProximateStory(uri, headline, labels[index]);
+      }
+    });
+    $("#id_lat").val(lat);
+    $("#id_lng").val(lng);
+    return showOverlays();
+  });
+};
+codeAddress = function(address) {
+  var centralAve, geocoder;
+  centralAve = new google.maps.LatLng(34.0039295, -118.2564734);
+  geocoder = new google.maps.Geocoder();
+  deleteOverlays();
+  return geocoder.geocode({
+    'address': address
+  }, function(results, status) {
+    latlng;    var latlng;
+    if (status === google.maps.GeocoderStatus.OK) {
+      latlng = results[0].geometry.location;
+      map.setCenter(latlng);
+      return submitLocation();
+    } else {
+      return submitLocation();
+    }
+  });
+};
+update_coords = function() {
+  var map_center;
+  map_center = map.getCenter();
+  $("#id_lat").val(map_center.lat());
+  $("#id_lng").val(map_center.lng());
+  return true;
+};
+mapOptions = {
+  zoom: 13,
+  center: getMapCenter(),
+  mapTypeId: google.maps.MapTypeId.ROADMAP,
+  navigationControl: true,
+  navigationControlOptions: {
+    style: google.maps.NavigationControlStyle.SMALL
+  },
+  streetViewControl: false,
+  mapTypeControl: false
+};
+size = window.OnCentral.mapSize;
+canvas = "map-canvas";
+crosshair = "crosshair";
+if (size === "big") {
+  canvas = "bigmap-canvas";
+  crosshair = "bigcrosshair";
+}
+geocoder = null;
+markersArray = [];
+map = new google.maps.Map(document.getElementById(canvas), mapOptions);
+if (typeof window.OnCentral.mapMode !== "undefined") {
+  google.maps.event.addDomListener(document.getElementById(crosshair), 'dblclick', function() {
+    return map.setZoom(map.zoom + 1);
+  });
+  update_coords();
+  submitLocation();
+  google.maps.event.addListener(map, 'center_changed', update_coords);
+}

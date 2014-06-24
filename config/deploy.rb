@@ -7,7 +7,7 @@ set :scm, :git
 set :deploy_via, :remote_cache
 set :deploy_to, config['deploy_to']
 set :keep_releases, 5
-set :user, "oncentral"
+set :user, config['user']
 set :use_sudo, false
 
 role :web, config['server']
